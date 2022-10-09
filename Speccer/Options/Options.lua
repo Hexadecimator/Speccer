@@ -30,14 +30,14 @@ local function generateOptions()
 				type = "toggle",
 				name = "Lock Frame",
 				desc = "Unlock to reposition the frame",
-				get = function() return Speccer.Locked end,
-				set = function(info, value) Speccer:ToggleFrameLock() end, -- TODO lock the frame here
+				get = function() return Speccer.db.char.Locked end,
+				set = function(info, value) Speccer:ToggleFrameLock() end,
 				width = "full",
 			},
 			bars = {
 				order = 20,
 				type = "group",
-				name = "Options",
+				name = "Button Setup",
 				args = {
 					options = {
 						type = "group",
@@ -51,24 +51,15 @@ local function generateOptions()
 								name = "Enable",
 								desc = "Enable or disable addon frame",
 								width = "full",
-								get = function(info) return Speccer.Visible end,
-								set = function(info, value) Speccer:ToggleGUI() end, -- TODO hide or show the addon frame here
-							},
-							TesterControl1 = {
-								order = 2,
-								type = "toggle",
-								name = "Test1",
-								desc = "Test1",
-								width = "full",
-								get = function(info) end,
-								set = function(info, value) Speccer:LoadCurrentSpecData() end, -- TODO hide or show the addon frame here
+								get = function(info) return Speccer.db.char.Visible end,
+								set = function(info, value) Speccer:ToggleGUI() end,
 							},
 							Button1GearsetDropdown = {
 								order = 60,
 								type = "select",
 								name = "Choose Button 1 Gearset",
 								desc = "Set button 1 behavior",
-								get = function(info) return Speccer.btn1_setID end,
+								get = function(info) return Speccer.db.char.btn1_setID end,
 								set = function(info, value) Speccer:UpdateButton1Icon(value) end,
 								values = Speccer.gearset_options_dropdown_populator,
 							},
@@ -77,7 +68,7 @@ local function generateOptions()
 								type = "select",
 								name = "Choose Button 1 Spec",
 								desc = "Set button 1 Spec",
-								get = function(info) return Speccer.btn1_specName end,
+								get = function(info) return Speccer.db.char.btn1_specName end,
 								set = function(info, value) Speccer:UpdateButton1Spec(value) end,
 								values = { PRIMARY="Primary", SECONDARY="Secondary" },
 							},
@@ -86,7 +77,7 @@ local function generateOptions()
 								type = "select",
 								name = "Choose Button 2 Gearset",
 								desc = "Set button 2 behavior",
-								get = function(info) return Speccer.btn2_setID end,
+								get = function(info) return Speccer.db.char.btn2_setID end,
 								set = function(info, value) Speccer:UpdateButton2Icon(value) end,
 								values = Speccer.gearset_options_dropdown_populator,
 							},
@@ -95,13 +86,19 @@ local function generateOptions()
 								type = "select",
 								name = "Choose Button 2 Spec",
 								desc = "Set button 2 Spec",
-								get = function(info) return Speccer.btn2_specName end,
+								get = function(info) return Speccer.db.char.btn2_specName end,
 								set = function(info, value) Speccer:UpdateButton2Spec(value) end,
 								values = { PRIMARY="Primary", SECONDARY="Secondary" },
 							},
 						},
 					},
 				},
+			},
+			bars1 = {
+				order = 30,
+				type = "group",
+				name = "Interface Options",
+				args = {} -- TODO: All the button resizing sliders and an option for vertical or horizontal stacking
 			},
 		},
 	}
@@ -117,7 +114,7 @@ function Speccer:ChatCmd(input)
 	if not input or input:trim() == "" then
 		LibStub("AceConfigDialog-3.0"):Open("Speccer")
 	else
-		LibStub("AceConfigCmd-3.0").HandleCommand(Speccer, "ba", "Speccer", input)
+		LibStub("AceConfigCmd-3.0").HandleCommand(Speccer, "sp", "Speccer", input)
 	end
 end
 
@@ -132,7 +129,7 @@ end
 
 function Speccer:SetupOptions()
 	LibStub("AceConfig-3.0"):RegisterOptionsTable("Speccer", getOptions)
-	AceConfigDialog:SetDefaultSize("Speccer", 400, 350)
-	self:RegisterChatCommand( "ba", "ChatCmd")
-	self:RegisterChatCommand( "Speccer", "ChatCmd")
+	AceConfigDialog:SetDefaultSize("Speccer", 400, 400)
+	self:RegisterChatCommand( "sp", "ChatCmd")
+	self:RegisterChatCommand( "speccer", "ChatCmd")
 end

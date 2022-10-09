@@ -1,5 +1,14 @@
 --[[
-    A basic template for quickly spinning up a new addon
+    Speccer, a clean way to change specs
+	Author: Marxwasright (Grobbulus - H)
+	Version: 0.1
+	
+	TODO:
+	1. Interface options
+		- button resizing
+		- add ability to stack buttons vertically or horizontally (arbitrary positioning??)
+	2. We don't really need to have 2 buttons always showing, we can toggle the current spec's button OFF
+		- however that button is useful to change to that gearset quickly, even if you're already in that talent tree
 ]]
 local _, Speccer = ...
 Speccer = LibStub("AceAddon-3.0"):NewAddon(Speccer, "Speccer", "AceConsole-3.0", "AceEvent-3.0", "AceHook-3.0")
@@ -11,23 +20,26 @@ local type, pairs, hooksecurefunc = type, pairs, hooksecurefunc
 
 local WoWWrath = (WOW_PROJECT_ID == WOW_PROJECT_WRATH_CLASSIC)
 
+-- these are arrays for holding the spec/gear data we scan on initialization
 local found_gearsets = {}
 Speccer.gearset_options_dropdown_populator = {}
 Speccer.spec_options_dropdown_populator = {}
-Speccer.btn1_setID = ''
-Speccer.btn2_setID = ''
-Speccer.btn1_specID = 1
-Speccer.btn2_specID = 2
-Speccer.btn1_specName = ""
-Speccer.btn2_specName = ""
-Speccer.PrimaryTalentIdx = 1
-Speccer.SecondaryTalentIdx = 2
 
+-- SpeccerDB defaults if none found
 local defaults = {
-    profile = {
-        teststring = "testoption1",
-        testboolean = false,
-        testnumber = 69
+    char = {
+		btn1_setID = "",
+		btn2_setID = "",
+		btn1_specID = 1,
+		btn2_specID = 1,
+		btn1_specName = "",  
+		btn2_specName = "",
+		btn1_iconID = 69,
+		btn2_iconID = 420,
+		frame_pos_x = 300,
+		frame_pos_y = 300,
+		Visible = true,
+		Locked = true
     }
 }
 
@@ -35,43 +47,25 @@ Speccer.CONFIG_VERSION = 1
 
 local frame = CreateFrame("Frame", "Speccer", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
 
--- Code that you want to run when the addon is first loaded goes here. (Actual Blizzard functionality)
 function Speccer:OnInitialize() 
-    -- TODO
-	-- TODO
-	-- TODO
-	-- TODO
-	-- TODO!!! SCAN FOR ALL SPECS AND GEARSETS ON INIT
-	-- save this info to arrays like Speccer.FOUND_GEARSETS and Speccer.FOUND_SPECS
-	-- if only 1 spec is found then just quit initializing Speccer
-	-- TODO
-	-- TODO
-	-- TODO
-	-- TODO
-	-- when this is done use these new arrays to populate the options dialog
-	-- also need to figure out how to save and retrieve variables SpeccerDB
-	
-	if not C_EquipmentSet.CanUseEquipmentSets() then Speccer:Print("CANNOT USE EQUIPMENT SETS. DISABLING.") return end
-	
-	
-	
-	self.db = LibStub("AceDB-3.0"):New("SpeccerDB", defaults) -- load defaults
-
-    self:SetupOptions() -- initialize and register the options menu
-
-    Speccer:Print("Initialized Speccer") -- Print is from AceConsole
-	
-	Speccer:InitializeWindow()
-	
+    -- DB init
+	self.db = LibStub("AceDB-3.0"):New("SpeccerDB", defaults)
+	Speccer:LoadPreferencesFromDB()
+    -- Options init
+    self:SetupOptions()
+    -- Gather player data init
 	Speccer:LoadCurrentGearsetData()
 	Speccer:LoadCurrentSpecData()
-	
+	--Speccer:Print("Loaded SpeccerDB")
+	-- Graphics init
+	Speccer:InitializeWindow()
+	Speccer:Print("Loaded Speccer! /sp or right click the frame for options")
 end
 
 function Speccer:InitializeWindow()
 	frame:SetWidth(70)
 	frame:SetHeight(40)
-	frame:SetPoint("BOTTOMLEFT", UIParent, 270, 20)
+	frame:SetPoint("BOTTOMLEFT", UIParent, self.db.char.frame_pos_x, self.db.char.frame_pos_y)
 --	frame:SetBackdrop({bgFile = "Interface/Tooltips/UI-Tooltip-Background", 
 --					   edgeFile = "Interface/Tooltips/UI-Tooltip-Border", 
 --					   tile = true, 
@@ -80,33 +74,35 @@ function Speccer:InitializeWindow()
 --					   insets = { left = 2, right = 2, top = 2, bottom = 2 }	})
 	frame:SetBackdropColor(0,0,0,1)
 	frame:EnableMouse(true)
-	frame:SetMovable(false)
-	Speccer.Locked = true
+	frame:SetMovable(self.db.char.Locked)
 	frame:SetFrameStrata("FULLSCREEN_DIALOG")
 	frame:RegisterForDrag("");
 	frame:SetClampedToScreen(true)
 	frame:SetScript("OnDragStart", function()	frame:StartMoving()	end)
-	frame:SetScript("OnDragStop", function()	frame:StopMovingOrSizing(); end)
+	frame:SetScript("OnDragStop", function()
+									frame:StopMovingOrSizing();
+									--Speccer:SaveFrameDataToDB();
+								  end)
 	frame:SetScript("OnMouseUp", function(self, button) if button == "RightButton" then LibStub("AceConfigDialog-3.0"):Open("Speccer") end end)
 	
 	b1 = CreateFrame("Button", "DamageButton", frame, "UIPanelButtonTemplate")
-	b1:SetSize(30, 30)
+	b1:SetSize(25, 25) -- TODO: btn size and position to options and save to DB
 	--b1:SetText("1")
 	b1:SetPoint("CENTER", frame, "CENTER", -15, -0)
 	b1:SetScript("OnClick", function() Speccer:ChangeSpecsButton1() end)
 	b1:SetScript("OnMouseUp", function(self, button) if button == "RightButton" then LibStub("AceConfigDialog-3.0"):Open("Speccer") end end)
-	--b1:SetNormalTexture(133537)
+	b1:SetNormalTexture(self.db.char.btn1_iconID)
 	
 	b2 = CreateFrame("Button", "HealButton", frame, "UIPanelButtonTemplate")
-	b2:SetSize(30, 30)
+	b2:SetSize(25, 25) -- TODO: btn size and position to options and save to DB
 	--b2:SetText("2")
 	b2:SetPoint("CENTER", frame, "CENTER", 15, 0)
 	b2:SetScript("OnClick", function() Speccer:ChangeSpecsButton2() end)
 	b2:SetScript("OnMouseUp", function(self, button) if button == "RightButton" then LibStub("AceConfigDialog-3.0"):Open("Speccer") end end)
-	--b2:SetNormalTexture(135487)
+	b2:SetNormalTexture(self.db.char.btn2_iconID)
 	
-	frame:Show()
-	Speccer.Visible = true
+	if(self.db.char.Visible) then frame:Show() else frame:Hide() end
+	if(self.db.char.Locked) then Speccer:LockMainFrame() else Speccer:UnlockMainFrame() end
 end
 
 --[[ 
@@ -124,25 +120,51 @@ end
 
 ]]
 
+function Speccer:LoadPreferencesFromDB()
+--[[	 
+	 Speccer:Print("Loaded DB Prefs: ")
+	 Speccer:Print(self.db.char.btn1_setID)
+	 Speccer:Print(self.db.char.btn2_setID)
+	 Speccer:Print(self.db.char.btn1_specID)
+	 Speccer:Print(self.db.char.btn2_specID)
+	 Speccer:Print(self.db.char.btn1_specName)
+	 Speccer:Print(self.db.char.btn2_specName)
+	 Speccer:Print(self.db.char.btn1_iconID)
+	 Speccer:Print(self.db.char.btn2_iconID)
+	 Speccer:Print(self.db.char.frame_pos_x)
+	 Speccer:Print(self.db.char.frame_pos_y)
+	 Speccer:Print(self.db.char.Visible)
+	 Speccer:Print(self.db.char.Locked)
+--]]
+end
+
+function Speccer:SaveFrameDataToDB()
+	-- x and y are relative to the frame's BOTTOMLEFT anchorpoint 
+	self.db.char.frame_pos_x = frame:GetLeft()
+	self.db.char.frame_pos_y = frame:GetBottom()
+end
+
 function Speccer:ChangeSpecsButton1()
-	if(Speccer.btn1_specID == '') then Speccer:Print("BTN1 NOT INIT") return end
-	EquipmentManager_EquipSet(Speccer.btn1_setID)
-	SetActiveTalentGroup(Speccer.btn1_specID)
+	if(self.db.char.btn1_setID == "") then Speccer:Print("BTN1 NOT INIT") return end
+	EquipmentManager_EquipSet(self.db.char.btn1_setID)
+	SetActiveTalentGroup(self.db.char.btn1_specID)
 end
 
 function Speccer:ChangeSpecsButton2()
-	if(Speccer.btn2_specID == '') then Speccer:Print("BTN2 NOT INIT") return end
-	EquipmentManager_EquipSet(Speccer.btn2_setID)
-	SetActiveTalentGroup(Speccer.btn2_specID)
+	if(self.db.char.btn2_setID == "") then Speccer:Print("BTN2 NOT INIT") return end
+	EquipmentManager_EquipSet(self.db.char.btn2_setID)
+	SetActiveTalentGroup(self.db.char.btn2_specID)
 end
 
 
 function Speccer:UpdateButton1Icon(gsID)	
-	--Speccer:Print(gsID)
 	for i=1,#found_gearsets do
 		local fgs = found_gearsets[i]
 		-- setName, iconID, setID, isEquipped
-		if(fgs[3] == gsID) then b1:SetNormalTexture(fgs[2]); Speccer.btn1_setID = gsID; break end -- TODO: Also save updates to DB
+		if(fgs[3] == gsID) then self.db.char.btn1_iconID = fgs[2]; 
+								b1:SetNormalTexture(self.db.char.btn1_iconID); 
+								self.db.char.btn1_setID = gsID; break 
+							end
 	end
 end
 
@@ -150,17 +172,16 @@ function Speccer:UpdateButton1Spec(sID)
 	-- sID == "PRIMARY" or "SECONDARY"
 	-- primary == 1
 	-- secondary == 2
-	Speccer.btn1_specName = sID
-	if(sID == "PRIMARY") then Speccer.btn1_specID = 1 
-	elseif(sID == "SECONDARY") then Speccer.btn1_specID = 2 end
-	--Speccer:Print("specName: " .. Speccer.btn1_specName .. " specID: " .. Speccer.btn1_specID)
+	self.db.char.btn1_specName = sID
+	if(sID == "PRIMARY") then self.db.char.btn1_specID = 1 
+	elseif(sID == "SECONDARY") then self.db.char.btn1_specID = 2 end
 end
 
 function Speccer:UpdateButton2Icon(gsID)
 	for i=1,#found_gearsets do
 		local fgs = found_gearsets[i]
 		-- setName, iconID, setID, isEquipped
-		if(fgs[3] == gsID) then b2:SetNormalTexture(fgs[2]); Speccer.btn2_setID = gsID; break end -- TODO: Also save updates to DB
+		if(fgs[3] == gsID) then self.db.char.btn2_iconID = fgs[2]; b2:SetNormalTexture(self.db.char.btn2_iconID); self.db.char.btn2_setID = gsID; break end -- TODO: Also save updates to DB
 	end
 end
 
@@ -168,10 +189,9 @@ function Speccer:UpdateButton2Spec(sID)
 	-- sID == "PRIMARY" or "SECONDARY"
 	-- primary == 1
 	-- secondary == 2
-	Speccer.btn2_specName = sID
-	if(sID == "PRIMARY") then Speccer.btn2_specID = 1 
-	elseif(sID == "SECONDARY") then Speccer.btn2_specID = 2 end
-	--Speccer:Print("specName: " .. Speccer.btn2_specName .. " specID: " .. Speccer.btn2_specID)
+	self.db.char.btn2_specName = sID
+	if(sID == "PRIMARY") then self.db.char.btn2_specID = 1 
+	elseif(sID == "SECONDARY") then self.db.char.btn2_specID = 2 end
 end
 
 function Speccer:LoadCurrentGearsetData()
@@ -189,8 +209,7 @@ function Speccer:LoadCurrentGearsetData()
 		}
 		table.insert(found_gearsets, equipset)
 	end
-	
-	--Speccer:Print("Following Gearsets Found:")
+
 	for i=1,#found_gearsets do
 		local gs = found_gearsets[i]
 		Speccer.gearset_options_dropdown_populator[i-1] = gs[1]
@@ -202,33 +221,37 @@ function Speccer:LoadCurrentSpecData()
 	
 	--local getspecs = C_SpecializationInfo.GetSpecIDs(specSetID)
 	local current_spec = GetActiveTalentGroup() -- NOT zero-indexed!!
-	Speccer:Print("Current Spec Index: " .. current_spec)
+	--Speccer:Print("Current Spec Index: " .. current_spec)
+	
+	-- TODO: Should just make this function check if they have more than 1 spec total
+	-- if they don't, don't load the addon
 end
 
 function Speccer:UnlockMainFrame()
 	frame:SetMovable(true)
-	Speccer.Locked = false
+	self.db.char.Locked = false
 	frame:RegisterForDrag("LeftButton","RightButton");
 end
 
 function Speccer:LockMainFrame()
 	frame:SetMovable(false)
-	Speccer.Locked = true
+	self.db.char.Locked = true
 	frame:RegisterForDrag("");
 end
 
 function Speccer:ToggleFrameLock()
-	Speccer.Locked = not Speccer.Locked
-	if(Speccer.Locked) then
-		Speccer:LockMainFrame()
+	self.db.char.Locked = not self.db.char.Locked
+	if(self.db.char.Locked) then
+		Speccer:LockMainFrame();
+		Speccer:SaveFrameDataToDB();
 	else
 		Speccer:UnlockMainFrame()
 	end
 end
 
 function Speccer:ToggleGUI()
-	Speccer.Visible = not Speccer.Visible
-	if(Speccer.Visible) then
+	self.db.char.Visible = not self.db.char.Visible
+	if(self.db.char.Visible) then
 		frame:Show()
 	else
 		frame:Hide()
